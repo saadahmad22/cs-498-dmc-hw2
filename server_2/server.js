@@ -6,7 +6,7 @@ const axios = require('axios');
 const app = express();
 app.use(bodyParser.json());
 
-const port = 3000;
+const port = 80;
 const SECONDARY_VM_IP = '34.136.18.48';
 
 // Connect to MariaDB
@@ -41,7 +41,7 @@ app.post('/register', async (req, res) => {
         res.json({ message: `User ${username} registered` });
 
         // Replicate to second instance
-        axios.post(`http://${SECONDARY_VM_IP}:3000/register`, { username }).catch(() => {});
+        axios.post(`http://${SECONDARY_VM_IP}:${port}/register`, { username }).catch(() => {});
     });
 });
 
@@ -62,7 +62,7 @@ app.post('/clear', (req, res) => {
         res.json({ message: "All users deleted" });
 
         // Replicate to second instance
-        axios.post(`http://${SECONDARY_VM_IP}:3000/clear`).catch(() => {});
+        axios.post(`http://${SECONDARY_VM_IP}:${port}/clear`).catch(() => {});
     });
 });
 
