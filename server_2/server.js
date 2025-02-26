@@ -85,14 +85,27 @@ app.get('/list', async (req, res) => {
 
 // Clear Users Endpoint
 app.post('/clear', (req, res) => {
+    // If this is a replicated clear call, just clear locally.
+    if (req.query.replicated) {
+        return db.query('DELETE FROM Users', (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.json({ message: "All users deleted (replicated)" });
+        });
+    }
+    
+    // Clear the local database.
     db.query('DELETE FROM Users', (err) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: "All users deleted" });
-
-        // Replicate to second instance
-        axios.post(`http://${SECONDARY_VM_IP}:${port}/clear`).catch(() => {});
+        
+        // Replicate the clear command to the secondary server, 
+        // but include a flag to avoid circular calls.
+        axios.post(`http://${SECONDARY_VM_IP}:${port}/clear?replicated=true`).catch((err) => {
+            console.error("Replication of /clear failed:", err.message);
+        });
     });
 });
+
 
 // Start Server
 app.listen(port, () => {
