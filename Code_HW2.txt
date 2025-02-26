@@ -1,0 +1,6 @@
+Code for one server is in `server_1`
+    - sever.js contains everything
+Code for the second server is in `sever_2`
+    - sever.js contains everything
+
+It is assumed that MariaDB is already up and running, and that the correct user is there
