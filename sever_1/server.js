@@ -49,38 +49,32 @@ app.post('/register', async (req, res) => {
 app.get('/list', async (req, res) => {
     // If this is a replicated call, only query the local database.
     if (req.query.replicated) {
-      return db.query('SELECT username FROM Users', (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        return res.json({ users: results.map(row => row.username) });
-      });
+        try {
+        const [rows] = await db.promise().query('SELECT username FROM Users');
+        return res.json({ users: rows.map(row => row.username) });
+        } catch (err) {
+        return res.status(500).json({ error: err.message });
+        }
     }
-  
+
     try {
-      // Fetch local users
-      const localUsers = await new Promise((resolve, reject) => {
-        db.query('SELECT username FROM Users', (err, results) => {
-          if (err) return reject(err);
-          resolve(results.map(row => row.username));
-        });
-      });
-  
-      // Attempt to fetch remote users, with the replicated flag
-      let remoteUsers = [];
-      try {
+        // Fetch local users using the promise wrapper
+        const [localRows] = await db.promise().query('SELECT username FROM Users');
+        let remoteUsers = [];
+        try {
         const remoteResponse = await axios.get(`http://${SECONDARY_VM_IP}:${port}/list?replicated=true`);
         remoteUsers = remoteResponse.data.users;
-      } catch (remoteErr) {
+        } catch (remoteErr) {
         console.error("Remote /list fetch failed:", remoteErr.message);
-        // If the remote call fails, proceed with local users only
-      }
-  
-      // Combine users and remove duplicates
-      const combinedUsers = Array.from(new Set([...localUsers, ...remoteUsers]));
-      res.json({ users: combinedUsers });
+        }
+
+        // Combine users and remove duplicates
+        const combinedUsers = Array.from(new Set([...localRows.map(row => row.username), ...remoteUsers]));
+        res.json({ users: combinedUsers });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+        res.status(500).json({ error: err.message });
     }
-  });  
+});  
 
 // Clear Users Endpoint
 app.post('/clear', (req, res) => {
