@@ -46,14 +46,42 @@ app.post('/register', async (req, res) => {
 });
 
 // List Users Endpoint, from part 2.3
-app.get('/list', (req, res) => {
-    // fetch from this  database. since data is replicated, no need to look at other server
-    db.query('SELECT username FROM Users', (err, results) => {
-        // return gracefully
+app.get('/list', async (req, res) => {
+    // If this is a replicated call, only query the local database.
+    if (req.query.replicated) {
+      return db.query('SELECT username FROM Users', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ users: results.map(row => row.username) });
-    });
-});
+        return res.json({ users: results.map(row => row.username) });
+      });
+    }
+  
+    try {
+      // Fetch local users
+      const localUsers = await new Promise((resolve, reject) => {
+        db.query('SELECT username FROM Users', (err, results) => {
+          if (err) return reject(err);
+          resolve(results.map(row => row.username));
+        });
+      });
+  
+      // Attempt to fetch remote users, with the replicated flag
+      let remoteUsers = [];
+      try {
+        const remoteResponse = await axios.get(`http://${SECONDARY_VM_IP}:${port}/list?replicated=true`);
+        remoteUsers = remoteResponse.data.users;
+      } catch (remoteErr) {
+        console.error("Remote /list fetch failed:", remoteErr.message);
+        // If the remote call fails, proceed with local users only
+      }
+  
+      // Combine users and remove duplicates
+      const combinedUsers = Array.from(new Set([...localUsers, ...remoteUsers]));
+      res.json({ users: combinedUsers });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
 
 // Clear Users Endpoint
 app.post('/clear', (req, res) => {
